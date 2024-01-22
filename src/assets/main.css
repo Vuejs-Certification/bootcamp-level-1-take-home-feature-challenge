@@ -1,0 +1,29 @@
+@import "../../console/styles.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#app {
+  @apply bg-[#f5f5f5] w-full h-full flex flex-col justify-center items-center;
+}
+
+.wrapper {
+  @apply border border-gray-200 rounded-lg p-8 w-[480px] shadow-lg bg-white;
+}
+
+.file-system {
+  @apply overflow-scroll h-96;
+}
+
+.selected-file {
+  @apply bg-gray-100 text-red-600 p-1 text-sm;
+}
+
+.app-title {
+  @apply text-xl;
+}
+
+.selected-file {
+  @apply mb-3;
+}

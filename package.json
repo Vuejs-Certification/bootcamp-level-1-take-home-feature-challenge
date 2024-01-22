@@ -1,0 +1,41 @@
+{
+  "name": "exercise-1",
+  "version": "0.0.0",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "test:unit": "vitest --environment jsdom",
+    "devtools": "./node_modules/.bin/vue-devtools",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "@heroicons/vue": "^2.0.16",
+    "@vue/devtools": "^6.5.0",
+    "vconsole": "^3.15.1",
+    "vconsole-sources": "^1.0.1",
+    "vue": "^3.2.38",
+    "vue-vconsole-devtools": "^1.0.9"
+  },
+  "devDependencies": {
+    "@rushstack/eslint-patch": "^1.1.4",
+    "@tailwindcss/forms": "^0.5.4",
+    "@tailwindcss/typography": "^0.5.9",
+    "@vitejs/plugin-vue": "^4.2.3",
+    "@vue/eslint-config-prettier": "^7.0.0",
+    "@vue/test-utils": "^2.4.0",
+    "autoprefixer": "^10.4.14",
+    "eslint": "^8.22.0",
+    "eslint-plugin-vue": "^9.3.0",
+    "jsdom": "^22.1.0",
+    "postcss": "^8.4.21",
+    "prettier": "^2.7.1",
+    "tailwindcss": "^3.2.7",
+    "vite": "^4.3.9",
+    "vitest": "^0.32.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
