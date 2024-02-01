@@ -13,6 +13,7 @@
   "dependencies": {
     "@heroicons/vue": "^2.0.16",
     "@vue/devtools": "^6.5.0",
+    "@vueschool/browser-devtools": "^1.0.8",
     "vconsole": "^3.15.1",
     "vconsole-sources": "^1.0.1",
     "vue": "^3.2.38",

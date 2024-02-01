@@ -528,6 +528,11 @@
     js-beautify "1.14.9"
     vue-component-type-helpers "1.8.4"
 
+"@vueschool/browser-devtools@^1.0.8":
+  version "1.0.8"
+  resolved "https://registry.yarnpkg.com/@vueschool/browser-devtools/-/browser-devtools-1.0.8.tgz#0ad2dec272affbf17fdebfc1efc733a9a0789726"
+  integrity sha512-+VfSUQ3nWMbTBtI+MDPBhidg9iKFxs42ft0pcwTvso4SjrfIGU4TnRxJwznQNtAj9lVbixzOdo7m7xSxtUQsZA==
+
 abab@^2.0.6:
   version "2.0.6"
   resolved "https://registry.npmjs.org/abab/-/abab-2.0.6.tgz#41b80f2c871d19686216b82309231cfd3cb3d291"
