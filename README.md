@@ -41,6 +41,9 @@ The challenge will require that you work in `RatingInput.vue` and refrence `App.
 
 > 💡 HINT: The stars will turn orange when the perfect-rating class is applied to the `rating-wrapper`
 
+By the end of the exercise you should have something that looks like this:
+![screenshot of completed](./screenshot.gif)
+
 ## Other Considerations
 
 - If you see the `data-test` attribute in the boilerplate don't remove it. If you remove it, your code may be invalid for the certificate.
