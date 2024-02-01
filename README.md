@@ -3,47 +3,43 @@ difficulty: 1
 tags: Code Challenge, Exercise Challenge, Vue 3
 ---
 
-# File Tree Component
+# Rating Input Feature Challenge
 
 # Challenge Description
 
-In this challenge, you are tasked with creating a `FileTree` component.
+In this challenge you are tasked with creating a star rating input component.
 
-The challenge will require that you work in `FileTree.vue`.
+The challenge will require that you work in `RatingInput.vue` and refrence `App.vue`.
 
 ## Requirements
 
-### The FileTree component should:
+### the Rating Input should:
 
-1. Work with it's current usage in `App.vue`
-2. Accept the following props:
+1. Accept the following props:
 
-   - files - an array of objects shaped like those in `@/src/assets/dataSource.js`
-   - selected - the currently selected file (default is null)
-   - path - a string indicating how deep in the file tree the component is (default is '/')
+   - modelValue - this represents the rating the user has picked and allows the component to work with v-model
+   - count - this is the total number of stars the rating should display (default is 5)
 
-3. Emit the following events:
+2. Emit the following events:
 
-   - select - emit when a file is clicked on. The payload is the complete file path.
+   - update:modelValue - emit when a star is clicked on. The payload is the rating (1, 2, 3, etc)
+   - You should also validate the event payload to ensure that it is a number
 
-4. Display the provided files in a traditional file tree format
+3. Display a button for each star based on the provided count
 
-   - Display the `IconFile` component to the left of the file name
-   - Display the `IconFolderCollapsed` component to the left of the folder name for folders that are NOT expanded
-   - Display the `IconFolderExpanded` component to the left of the folder name for folders that ARE expanded
-   - Expand and collapse files when the user clicks on the folder icon
-   - Nest each level visually under the parent folder
+4. Display solid yellow stars for stars less than or equal to the `modelValue`
 
-> 💡 HINT: The FileTree component is already registered globally so you can use it anywhere you want (including in itself)
+5. Display outlined gray stars for stars greater than the `modelValue`
 
-5. Handle selecting files
+6. Support the following keyboard shortcuts when the rating wrapper is focused
 
-   - When a file is clicked, emit the `select` event with the complete file path
-   - When a file is clicked, add the `selected` class to the file to give it a blue color
-   - When a file is clicked, remove the `selected` class from the previously selected file
-   - When implemented correctly the selected file path should display in `App.vue` inside the `code.selected-file` element
+   - Pressing keyboard numbers 0-9 should set the rating accordingly
+   - Pressing the `ArrowUp` or `ArrowRight` key should increment the rating by 1
+   - Pressing the `ArrowDown` or `ArrowLeft` key should decrement the rating by 1
 
-![Screenshot of the solution](./screenshot.gif)
+7. Apply the class `perfect-rating` to the `rating-wrapper` div when a perfect rating is selected
+
+> 💡 HINT: The stars will turn orange when the perfect-rating class is applied to the `rating-wrapper`
 
 ## Other Considerations
 

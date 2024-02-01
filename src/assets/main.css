@@ -8,22 +8,25 @@
   @apply bg-[#f5f5f5] w-full h-full flex flex-col justify-center items-center;
 }
 
-.wrapper {
-  @apply border border-gray-200 rounded-lg p-8 w-[480px] shadow-lg bg-white;
+#app h1 {
+  @apply text-3xl font-bold text-center mb-3 text-gray-600;
 }
 
-.file-system {
-  @apply overflow-scroll h-96;
+[data-test="rating-wrapper"] {
+  @apply p-2 flex items-center justify-center mb-2;
+}
+button {
+  @apply focus:outline-none;
 }
 
-.selected-file {
-  @apply bg-gray-100 text-red-600 p-1 text-sm;
+.perfect-rating svg {
+  @apply text-orange-500;
 }
 
-.app-title {
-  @apply text-xl;
+.solid-star {
+  @apply w-6 h-6 text-yellow-500;
 }
 
-.selected-file {
-  @apply mb-3;
+.outline-star {
+  @apply w-6 h-6 text-gray-500;
 }

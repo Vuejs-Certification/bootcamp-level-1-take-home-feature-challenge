@@ -1,15 +1,13 @@
-- Collapsed folders display the `IconFolderCollapsed` on the left side
+- The component displays the proper number of stars based on the count prop
 
-- Expanded folders display the `IconFolderExpanded` on the left side
+- The user can control the rating with the arrow and number keys
 
-- Files display the `IconFile` on the left side
+- The user can click on a star to set the rating
 
-- Files include the `selected` class and display with a blue text color when selected
+- The component accepts the `modelValue` and `count` props
 
-- Files do NOT include the `selected` class and have a black text color when NOT selected
+- The component emits an `update:modelValue` event when a star is clicked
 
-- The file tree is nested visually under the parent folder
+- The component displays outlined or solid stars properly based on the selected rating (`modelValue`)
 
-- Clicking on a folder expands or collapses the folder
-
-- Clicking on a file emits the `select` event and show the selected file on th page
+- The component wrapper div includes the class `perfect-rating` and the stars display orange when a perfect rating is given
