@@ -17,8 +17,8 @@ The challenge will require that you work in `RatingInput.vue` and refrence `App.
 
 1. Accept the following props:
 
-   - modelValue - this represents the rating the user has picked and allows the component to work with v-model
-   - count - this is the total number of stars the rating should display (default is 5)
+   - `modelValue` - this represents the rating the user has picked and allows the component to work with v-model
+   - `count` - this is the total number of stars the rating should display (default is 5)
 
 2. Emit the following events:
 
