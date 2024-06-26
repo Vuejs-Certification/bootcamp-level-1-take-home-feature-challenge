@@ -22,7 +22,7 @@ The challenge will require that you work in `RatingInput.vue` and reference `App
 
 2. Emit the following events:
 
-   - update:modelValue - emit when a star is clicked on. The payload is the rating (1, 2, 3, etc)
+   - `update:modelValue` - emit when a star is clicked on. The payload is the rating (1, 2, 3, etc)
    - You should also validate the event payload to ensure that it is a number
 
 3. Display a button for each star based on the provided count
