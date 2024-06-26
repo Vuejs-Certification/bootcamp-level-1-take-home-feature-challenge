@@ -9,7 +9,7 @@ tags: Code Challenge, Exercise Challenge, Vue 3
 
 In this challenge you are tasked with creating a star rating input component.
 
-The challenge will require that you work in `RatingInput.vue` and refrence `App.vue`.
+The challenge will require that you work in `RatingInput.vue` and reference `App.vue`.
 
 ## Requirements
 
