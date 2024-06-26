@@ -29,15 +29,21 @@ The challenge will require that you work in `RatingInput.vue` and reference `App
 
 4. Display solid yellow stars for stars less than or equal to the `modelValue`
 
+> 💡 HINT: This markup is perfect for a solid yellow star:
+> `<StarIconSolid data-test="solid-star" class="solid-star" />`
+
 5. Display outlined gray stars for stars greater than the `modelValue`
 
-6. Support the following keyboard shortcuts when the rating wrapper is focused
+> 💡 HINT: This markup is perfect for an outlined gray star:
+> `<StarIconOutline data-test="outline-star" class="outline-star" />`
+
+1. Support the following keyboard shortcuts when the rating wrapper is focused
 
    - Pressing keyboard numbers 0-9 should set the rating accordingly
    - Pressing the `ArrowUp` or `ArrowRight` key should increment the rating by 1
    - Pressing the `ArrowDown` or `ArrowLeft` key should decrement the rating by 1
 
-7. Apply the class `perfect-rating` to the `rating-wrapper` div when a perfect rating is selected
+2. Apply the class `perfect-rating` to the `rating-wrapper` div when a perfect rating is selected
 
 > 💡 HINT: The stars will turn orange when the perfect-rating class is applied to the `rating-wrapper`
 
