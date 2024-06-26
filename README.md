@@ -42,7 +42,7 @@ The challenge will require that you work in `RatingInput.vue` and refrence `App.
 > 💡 HINT: The stars will turn orange when the perfect-rating class is applied to the `rating-wrapper`
 
 By the end of the exercise you should have something that looks like this:
-![screenshot of completed](./screenshot.gif)
+![screenshot of completed](https://images.certificates.dev/ratings-screenshot.gif)
 
 ## Other Considerations
 
