@@ -1,6 +1,7 @@
 ---
 difficulty: 1
 tags: Code Challenge, Exercise Challenge, Vue 3
+openFiles: src/components/RatingInput.vue,src/App.vue
 ---
 
 # Rating Input Feature Challenge
