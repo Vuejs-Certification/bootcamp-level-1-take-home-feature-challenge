@@ -1,6 +1,6 @@
 - The component displays the proper number of stars based on the count prop
 
-- The user can control the rating with the arrow and number keys
+- The user can control the rating with the arrow and number keys (left, right, up, down, 1-9)
 
 - The user can click on a star to set the rating
 

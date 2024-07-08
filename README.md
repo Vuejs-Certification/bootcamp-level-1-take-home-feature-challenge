@@ -40,7 +40,7 @@ The challenge will require that you work in `RatingInput.vue` and reference `App
 
 1. Support the following keyboard shortcuts when the rating wrapper is focused
 
-   - Pressing keyboard numbers 0-9 should set the rating accordingly
+   - Pressing keyboard numbers 1-9 should set the rating accordingly
    - Pressing the `ArrowUp` or `ArrowRight` key should increment the rating by 1
    - Pressing the `ArrowDown` or `ArrowLeft` key should decrement the rating by 1
 
