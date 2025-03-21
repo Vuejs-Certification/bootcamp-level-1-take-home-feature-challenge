@@ -14,5 +14,9 @@ module.exports = {
   parserOptions: {
     ecmaVersion: "latest",
   },
-  ignorePatterns: ["/*", "!/src"]
+  ignorePatterns: ["/*", "!/src"],
+  rules: {
+    "vue/multi-word-component-names": "off",
+    "no-unused-vars": "warn"
+  }
 };
