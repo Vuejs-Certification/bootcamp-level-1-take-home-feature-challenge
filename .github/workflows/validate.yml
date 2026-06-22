@@ -1,0 +1,15 @@
+name: Validate Markdown
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install pyyaml
+      - name: Validate coding challenge format
+        run: bash .github/scripts/validate-coding-challenge.sh .
