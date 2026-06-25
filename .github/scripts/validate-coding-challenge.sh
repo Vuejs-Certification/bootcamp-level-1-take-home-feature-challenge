@@ -5,7 +5,7 @@
 # Validates coding challenge projects for proper CHECKLIST.md and README.md format:
 #
 # README.md expected structure:
-#   1. YAML frontmatter with: difficulty, tags (must include 'codechallenge'), openFiles
+#   1. YAML frontmatter with: difficulty, tags, openFiles
 #   2. H1 title (# Challenge Title)
 #   3. Time limit line (**Time Limit: XX minutes**)
 #   4. # Challenge Description section
@@ -36,7 +36,7 @@
 # Usage: ./validate-coding-challenge.sh <project_directory_or_parent>
 #
 
-set -euo pipefail
+set -uo pipefail
 
 # ── Help ──
 show_help() {
@@ -128,15 +128,30 @@ PROJECTS_CHECKED=0
 
 TARGET="${1:-.}"
 
+# Accumulate findings for the PR summary comment (see maybe_post_pr_comment).
+SUMMARY_ROWS_FILE="$(mktemp 2>/dev/null || echo "/tmp/cc_rows.$$")"
+: > "$SUMMARY_ROWS_FILE"
+CURRENT_PROJECT=""
+record_row() {
+    # $1=level emoji, $2=file label, $3=message. Escape pipes/newlines for the md table.
+    local lvl="$1" f="$2" m="$3"
+    [ -n "$CURRENT_PROJECT" ] && f="$CURRENT_PROJECT/$f"
+    f=$(printf '%s' "$f" | tr '\n' ' ' | sed 's/|/\\|/g')
+    m=$(printf '%s' "$m" | tr '\n' ' ' | sed 's/|/\\|/g')
+    printf '| %s | %s | %s |\n' "$lvl" "$f" "$m" >> "$SUMMARY_ROWS_FILE"
+}
+
 error() {
     local file="$1" msg="$2"
     echo -e "  ${RED}ERROR${NC} [$file]: $msg"
+    record_row "❌" "$file" "$msg"
     ERRORS=$((ERRORS + 1))
 }
 
 warn() {
     local file="$1" msg="$2"
     echo -e "  ${YELLOW}WARN${NC}  [$file]: $msg"
+    record_row "⚠️" "$file" "$msg"
     WARNINGS=$((WARNINGS + 1))
 }
 
@@ -202,10 +217,9 @@ validate_readme() {
         fi
     fi
 
-    # ── 2. Required metadata fields ──
+    # ── 2. Metadata fields (parser-aligned: all optional with defaults → WARN only) ──
     if ! echo "$frontmatter" | grep -qE '^difficulty:\s+[0-9]+'; then
-        error "README.md" "Missing or invalid 'difficulty' in frontmatter (expected: difficulty: <number>)"
-        has_error=true
+        warn "README.md" "Missing or invalid 'difficulty' in frontmatter (expected: difficulty: <number>) — parser defaults to 1"
     else
         local difficulty
         difficulty=$(echo "$frontmatter" | grep -oE '^difficulty:\s+[0-9]+' | grep -oE '[0-9]+')
@@ -215,38 +229,27 @@ validate_readme() {
     fi
 
     if ! echo "$frontmatter" | grep -qE '^tags:\s+.+'; then
-        error "README.md" "Missing 'tags' in frontmatter"
-        has_error=true
-    else
-        local tags_line
-        tags_line=$(echo "$frontmatter" | grep -E '^tags:')
-        if ! echo "$tags_line" | grep -qi 'codechallenge'; then
-            warn "README.md" "Tags recommended to include 'codechallenge' — found: $tags_line"
-        fi
+        warn "README.md" "Missing 'tags' in frontmatter — parser defaults to empty tags"
     fi
 
     if ! echo "$frontmatter" | grep -qE '^openFiles:\s+.+'; then
-        error "README.md" "Missing 'openFiles' in frontmatter (should list files to open in editor)"
-        has_error=true
+        warn "README.md" "Missing 'openFiles' in frontmatter (should list files to open in editor) — parser defaults to null"
     fi
 
-    # ── 2b. Validate known frontmatter field types (parser-aligned) ──
+    # ── 2b. Known frontmatter field types (parser casts with defaults → WARN only) ──
     if echo "$frontmatter" | grep -qE '^difficulty:'; then
         if ! echo "$frontmatter" | grep -qE '^difficulty:\s+[0-9]+\s*$'; then
-            error "README.md" "Field 'difficulty' must be an integer"
-            has_error=true
+            warn "README.md" "Field 'difficulty' should be an integer"
         fi
     fi
     if echo "$frontmatter" | grep -qE '^freebie:'; then
         if ! echo "$frontmatter" | grep -qE '^freebie:\s+(true|false)\s*$'; then
-            error "README.md" "Field 'freebie' must be a boolean (true/false)"
-            has_error=true
+            warn "README.md" "Field 'freebie' should be a boolean (true/false)"
         fi
     fi
     if echo "$frontmatter" | grep -qE '^training:'; then
         if ! echo "$frontmatter" | grep -qE '^training:\s+(true|false)\s*$'; then
-            error "README.md" "Field 'training' must be a boolean (true/false)"
-            has_error=true
+            warn "README.md" "Field 'training' should be a boolean (true/false)"
         fi
     fi
 
@@ -269,16 +272,24 @@ validate_readme() {
     local line_after_fm
     line_after_fm=$(sed -n "$((fm_close + 1))p" "$file")
     if [ -n "$line_after_fm" ]; then
-        error "README.md" "Expected blank line after frontmatter (line $((fm_close + 1)))"
+        warn "README.md" "Expected blank line after frontmatter (line $((fm_close + 1)))"
+    fi
+
+    # ── 3b. No stray '---' line in the body (parser-breaking) ──
+    # splitMarkdown() splits on /^---\s*$/m and requires exactly 2 parts; a '---' in the
+    # body produces a 3rd part and the parser throws.
+    local stray_fm
+    stray_fm=$(awk -v c="$fm_close" 'NR>c && /^---[[:space:]]*$/ { print NR; exit }' "$file")
+    if [ -n "$stray_fm" ]; then
+        error "README.md" "Stray '---' line in body at line $stray_fm (parser splits on '---' and will fail — escape or remove it)"
         has_error=true
     fi
 
-    # ── 4. H1 Title ──
+    # ── 4. H1 Title (parser takes first non-empty line → missing is WARN; >255 breaks DB) ──
     local h1_title
     h1_title=$(grep -n '^# ' "$file" | head -1 || true)
     if [ -z "$h1_title" ]; then
-        error "README.md" "Missing H1 title (# Challenge Title)"
-        has_error=true
+        warn "README.md" "Missing H1 title (# Challenge Title) — parser uses the first non-empty body line"
     else
         local h1_text="${h1_title#*:}"
         h1_text="${h1_text#\# }"
@@ -288,64 +299,51 @@ validate_readme() {
         fi
     fi
 
-    # ── 5. Time limit ──
+    # ── 5-10. Documentation conventions (not parsed by certificates-api → WARN only) ──
+    # The parser stores the whole body as HTML; no specific section is required to import.
     if ! grep -qE '^\*\*Time Limit:\s+[0-9]+\s+minutes\*\*' "$file"; then
-        error "README.md" "Missing time limit line (expected: **Time Limit: XX minutes**)"
-        has_error=true
+        warn "README.md" "Missing time limit line (expected: **Time Limit: XX minutes**)"
     fi
 
-    # ── 6. Challenge Description section ──
     if ! grep -qE '^# Challenge Description' "$file"; then
-        error "README.md" "Missing '# Challenge Description' section"
-        has_error=true
+        warn "README.md" "Missing '# Challenge Description' section"
     fi
 
-    # ── 7. Requirements section ──
     if ! grep -qE '^## Requirements' "$file"; then
-        error "README.md" "Missing '## Requirements' section"
-        has_error=true
+        warn "README.md" "Missing '## Requirements' section"
     fi
 
-    # Check for Part subsections
     local part_count
     part_count=$(count_matches '^### Part [0-9]+' "$file")
     if [ "$part_count" -eq 0 ]; then
-        error "README.md" "No '### Part N:' subsections found under Requirements"
-        has_error=true
+        warn "README.md" "No '### Part N:' subsections found under Requirements"
     fi
 
-    # ── 8. Files to Create/Modify section ──
     if ! grep -qE '^## Files to (Create/Modify|Modify|Create)' "$file"; then
-        error "README.md" "Missing '## Files to Create/Modify' section"
-        has_error=true
+        warn "README.md" "Missing '## Files to Create/Modify' section"
     fi
 
-    # ── 9. Getting Started section ──
     if ! grep -qE '^## Getting Started' "$file"; then
-        error "README.md" "Missing '## Getting Started' section"
-        has_error=true
+        warn "README.md" "Missing '## Getting Started' section"
     else
         if ! grep -qE 'composer install|npm install|yarn install|pnpm install' "$file"; then
             warn "README.md" "Getting Started section may be missing dependency install instruction"
         fi
     fi
 
-    # ── 10. Running Tests section ──
     if ! grep -qE '^## Running Tests' "$file"; then
-        error "README.md" "Missing '## Running Tests' section"
-        has_error=true
+        warn "README.md" "Missing '## Running Tests' section"
     else
         if ! grep -qE 'vendor/bin/pest|vendor/bin/phpunit|php artisan test|npm test|npx jest|ng test|cypress|vitest' "$file"; then
             warn "README.md" "Running Tests section may be missing test command"
         fi
     fi
 
-    # ── 11. Code blocks should be properly closed ──
+    # ── 11. Code blocks balance (rendering quality, not a parser throw → WARN) ──
     local open_blocks
     open_blocks=$(count_matches '^\x60\x60\x60' "$file")
     if [ "$((open_blocks % 2))" -ne 0 ]; then
-        error "README.md" "Unclosed code block (odd number of \`\`\` delimiters: $open_blocks)"
-        has_error=true
+        warn "README.md" "Unclosed code block (odd number of \`\`\` delimiters: $open_blocks)"
     fi
 
     # ── 12. Other Considerations section (recommended) ──
@@ -371,20 +369,22 @@ validate_checklist() {
     local line_count
     line_count=$(wc -l < "$file" | tr -d '[:space:]')
 
+    # NOTE: certificates-api parseChecklist() is regex line-filtering (matches `^\s*-\s+`,
+    # strips `[ x]` checkboxes), NOT Yaml::parse(). It silently ignores any non-matching
+    # line and drops empties — so nothing here breaks import. All checks below are WARN.
     if [ "$line_count" -eq 0 ]; then
-        error "CHECKLIST.md" "File is empty"
+        warn "CHECKLIST.md" "File is empty — challenge imports with an empty checklist"
         return
     fi
 
-    # ── 1. Must NOT have frontmatter ──
+    # ── 1. Frontmatter is non-standard (parser ignores it) ──
     local first_line
     first_line=$(head -n 1 "$file")
     if [ "$first_line" = "---" ]; then
-        error "CHECKLIST.md" "Should not contain frontmatter (found '---' on line 1)"
-        has_error=true
+        warn "CHECKLIST.md" "Should not contain frontmatter (found '---' on line 1) — parser ignores non-'- ' lines"
     fi
 
-    # ── 1b. Validate as YAML (parser-aligned: parsed via Yaml::parse()) ──
+    # ── 1b. YAML shape (informational only — parser does not Yaml::parse this file) ──
     if command -v python3 >/dev/null 2>&1; then
         local yaml_result
         yaml_result=$(python3 -c "
@@ -406,22 +406,18 @@ except yaml.YAMLError as e:
                 info "CHECKLIST.md" "Valid YAML array with $yaml_count top-level items"
                 ;;
             EMPTY)
-                error "CHECKLIST.md" "YAML parses as empty (null) — no checklist items"
-                has_error=true
+                warn "CHECKLIST.md" "YAML parses as empty (null) — no checklist items"
                 ;;
             NOT_LIST)
-                error "CHECKLIST.md" "YAML does not parse as an array/list (parser expects a YAML array)"
-                has_error=true
+                warn "CHECKLIST.md" "Not a YAML array/list — parser only reads '- ' lines, the rest is ignored"
                 ;;
             ERROR:*)
-                error "CHECKLIST.md" "Invalid YAML syntax — parser will fail: ${yaml_result#ERROR:}"
-                has_error=true
+                warn "CHECKLIST.md" "Invalid YAML syntax (parser does not Yaml::parse this file, but fix for clarity): ${yaml_result#ERROR:}"
                 ;;
         esac
     fi
 
-    # ── 2. Every non-empty line must be a checklist item starting with '- ' ──
-    # Note: nested items (indented '- ') are valid YAML sub-arrays
+    # ── 2. Lines that aren't '- ' items are ignored by the parser ──
     local item_count=0
     local line_num=0
     while IFS= read -r line || [ -n "$line" ]; do
@@ -438,15 +434,13 @@ except yaml.YAMLError as e:
                 # Indented lines are valid YAML continuation (nested items, multiline strings)
                 ;;
             *)
-                error "CHECKLIST.md" "Line $line_num is not a valid checklist item (must start with '- ' or be indented): '$line'"
-                has_error=true
+                warn "CHECKLIST.md" "Line $line_num is not a '- ' checklist item and will be ignored by the parser: '$line'"
                 ;;
         esac
     done < "$file"
 
     if [ "$item_count" -eq 0 ]; then
-        error "CHECKLIST.md" "No checklist items found"
-        has_error=true
+        warn "CHECKLIST.md" "No '- ' checklist items found — challenge imports with an empty checklist"
     elif [ "$item_count" -lt 3 ]; then
         warn "CHECKLIST.md" "Only $item_count checklist items found (expected at least 3)"
     fi
@@ -469,8 +463,7 @@ except yaml.YAMLError as e:
     local empty_items
     empty_items=$(count_matches '^- $' "$file")
     if [ "$empty_items" -gt 0 ]; then
-        error "CHECKLIST.md" "Found $empty_items empty checklist item(s) ('- ' with no text)"
-        has_error=true
+        warn "CHECKLIST.md" "Found $empty_items empty checklist item(s) ('- ' with no text) — parser drops empties"
     fi
 
     if ! $has_error; then
@@ -489,12 +482,11 @@ validate_reviewer() {
 
     local has_error=false
 
-    # ── 1. Must not be empty ──
+    # ── 1. Empty (parser → Str::markdown('') = '', no break → WARN) ──
     local file_size
     file_size=$(wc -c < "$file" | tr -d '[:space:]')
     if [ "$file_size" -eq 0 ]; then
-        error "REVIEWER.md" "File exists but is empty"
-        has_error=true
+        warn "REVIEWER.md" "File exists but is empty"
         return
     fi
 
@@ -505,12 +497,11 @@ validate_reviewer() {
         warn "REVIEWER.md" "Contains frontmatter — parser converts raw markdown to HTML, frontmatter may appear in output"
     fi
 
-    # ── 3. Code blocks should be properly closed ──
+    # ── 3. Code blocks balance (rendering quality, not a parser throw → WARN) ──
     local open_blocks
     open_blocks=$(count_matches '^\x60\x60\x60' "$file")
     if [ "$((open_blocks % 2))" -ne 0 ]; then
-        error "REVIEWER.md" "Unclosed code block (odd number of \`\`\` delimiters: $open_blocks)"
-        has_error=true
+        warn "REVIEWER.md" "Unclosed code block (odd number of \`\`\` delimiters: $open_blocks)"
     fi
 
     if ! $has_error; then
@@ -522,6 +513,12 @@ validate_project() {
     local project_dir="$1"
     local project_name
     project_name=$(basename "$project_dir")
+    # Qualify summary rows with the project name, except for single-repo (".") runs.
+    if [ "$project_name" = "." ] || [ "$project_dir" = "$TARGET" ]; then
+        CURRENT_PROJECT=""
+    else
+        CURRENT_PROJECT="$project_name"
+    fi
 
     echo ""
     echo -e "${CYAN}━━━ Project: $project_name ━━━${NC}"
@@ -569,6 +566,43 @@ echo -e " Warnings:         ${YELLOW}$WARNINGS${NC}"
 echo -e " Info:             ${BLUE}$INFO_COUNT${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+# ── Post / update a sticky summary comment on the PR (GitHub Actions only) ──
+maybe_post_pr_comment() {
+    [ "${GITHUB_ACTIONS:-}" = "true" ] || return 0
+    [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ] || return 0
+    command -v gh >/dev/null 2>&1 || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    local repo="${GITHUB_REPOSITORY:-}" pr
+    pr=$(jq -r '.pull_request.number // empty' "${GITHUB_EVENT_PATH:-/dev/null}" 2>/dev/null)
+    [ -n "$repo" ] && [ -n "$pr" ] || return 0
+
+    local marker="<!-- markdown-validation-summary -->" status body rows
+    if [ "$ERRORS" -gt 0 ]; then
+        status="❌ **$ERRORS error(s)**, $WARNINGS warning(s) — errors **break the certificates import** and fail this check."
+    elif [ "$WARNINGS" -gt 0 ]; then
+        status="✅ Passing with **$WARNINGS warning(s)** — non-critical; the content still imports into certificates."
+    else
+        status="✅ All checks passed — no issues."
+    fi
+    body="${marker}"$'\n'"### Coding challenge validation"$'\n\n'"${status}"
+    rows=$(cat "$SUMMARY_ROWS_FILE")
+    if [ -n "$rows" ]; then
+        body="${body}"$'\n\n'"| Level | File | Issue |"$'\n'"|:--|:--|:--|"$'\n'"${rows}"
+    fi
+
+    local cid
+    cid=$(gh api --paginate "repos/$repo/issues/$pr/comments" \
+            --jq ".[] | select(.body != null and (.body | contains(\"$marker\"))) | .id" 2>/dev/null | head -1)
+    if [ -n "$cid" ]; then
+        gh api -X PATCH "repos/$repo/issues/comments/$cid" -f body="$body" >/dev/null 2>&1 || true
+    else
+        gh api -X POST "repos/$repo/issues/$pr/comments" -f body="$body" >/dev/null 2>&1 || true
+    fi
+}
+
+maybe_post_pr_comment
+rm -f "$SUMMARY_ROWS_FILE" 2>/dev/null || true
 
 if [ "$ERRORS" -gt 0 ]; then
     echo -e "${RED}VALIDATION FAILED${NC}"

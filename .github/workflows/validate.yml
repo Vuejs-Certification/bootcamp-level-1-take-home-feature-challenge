@@ -2,6 +2,9 @@ name: Validate Markdown
 on:
   push:
   pull_request:
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -12,4 +15,6 @@ jobs:
           python-version: '3.x'
       - run: pip install pyyaml
       - name: Validate coding challenge format
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/validate-coding-challenge.sh .
