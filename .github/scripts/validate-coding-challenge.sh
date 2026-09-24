@@ -228,10 +228,6 @@ validate_readme() {
         fi
     fi
 
-    if ! echo "$frontmatter" | grep -qE '^tags:\s+.+'; then
-        warn "README.md" "Missing 'tags' in frontmatter — parser defaults to empty tags"
-    fi
-
     if ! echo "$frontmatter" | grep -qE '^openFiles:\s+.+'; then
         warn "README.md" "Missing 'openFiles' in frontmatter (should list files to open in editor) — parser defaults to null"
     fi
@@ -261,82 +257,39 @@ validate_readme() {
     fi
 
     # ── 2d. Check for unknown frontmatter fields (parser-aligned) ──
-    local known_fields="difficulty|tags|chapter|training|freebie|category|openFiles"
+    local known_fields="difficulty|tags|chapter|training|freebie|bootcamp|category|openFiles|starterBuilds"
     local unknown_fields
     unknown_fields=$(echo "$frontmatter" | grep -vE "^($known_fields):" | grep -E '^[a-zA-Z_]+:' || true)
     if [ -n "$unknown_fields" ]; then
         warn "README.md" "Unknown frontmatter field(s) (may be ignored by parser): $(echo "$unknown_fields" | tr '\n' ', ')"
     fi
 
-    # ── 3. Blank line after frontmatter ──
-    local line_after_fm
-    line_after_fm=$(sed -n "$((fm_close + 1))p" "$file")
-    if [ -n "$line_after_fm" ]; then
-        warn "README.md" "Expected blank line after frontmatter (line $((fm_close + 1)))"
-    fi
-
     # ── 3b. No stray '---' line in the body (parser-breaking) ──
     # splitMarkdown() splits on /^---\s*$/m and requires exactly 2 parts; a '---' in the
-    # body produces a 3rd part and the parser throws.
+    # body produces a 3rd part and the parser throws. A '---' with nothing but whitespace
+    # after it is fine: that 3rd part is empty and PREG_SPLIT_NO_EMPTY drops it.
     local stray_fm
-    stray_fm=$(awk -v c="$fm_close" 'NR>c && /^---[[:space:]]*$/ { print NR; exit }' "$file")
+    stray_fm=$(awk -v c="$fm_close" '
+        NR > c && !stray && /^---[[:space:]]*$/ { stray = NR; next }
+        stray && NF { print stray; exit }
+    ' "$file")
     if [ -n "$stray_fm" ]; then
         error "README.md" "Stray '---' line in body at line $stray_fm (parser splits on '---' and will fail — escape or remove it)"
         has_error=true
     fi
 
-    # ── 4. H1 Title (parser takes first non-empty line → missing is WARN; >255 breaks DB) ──
-    local h1_title
-    h1_title=$(grep -n '^# ' "$file" | head -1 || true)
-    if [ -z "$h1_title" ]; then
-        warn "README.md" "Missing H1 title (# Challenge Title) — parser uses the first non-empty body line"
-    else
-        local h1_text="${h1_title#*:}"
-        h1_text="${h1_text#\# }"
-        if [ "${#h1_text}" -gt 255 ]; then
-            error "README.md" "H1 title exceeds 255 characters (${#h1_text} chars)"
-            has_error=true
-        fi
+    # ── 4. Title (ExerciseHelper::parseBody takes the first non-empty body line,
+    #    stripping a leading '#'..'######'; >255 chars breaks the DB column) ──
+    local title_line
+    title_line=$(awk -v c="$fm_close" 'NR > c && NF { print; exit }' "$file")
+    if ! echo "$title_line" | grep -qE '^#{1,6} '; then
+        warn "README.md" "First line after frontmatter is not a heading, so it becomes the challenge title: '${title_line:0:80}'"
     fi
-
-    # ── 5-10. Documentation conventions (not parsed by certificates-api → WARN only) ──
-    # The parser stores the whole body as HTML; no specific section is required to import.
-    if ! grep -qE '^\*\*Time Limit:\s+[0-9]+\s+minutes\*\*' "$file"; then
-        warn "README.md" "Missing time limit line (expected: **Time Limit: XX minutes**)"
-    fi
-
-    if ! grep -qE '^# Challenge Description' "$file"; then
-        warn "README.md" "Missing '# Challenge Description' section"
-    fi
-
-    if ! grep -qE '^## Requirements' "$file"; then
-        warn "README.md" "Missing '## Requirements' section"
-    fi
-
-    local part_count
-    part_count=$(count_matches '^### Part [0-9]+' "$file")
-    if [ "$part_count" -eq 0 ]; then
-        warn "README.md" "No '### Part N:' subsections found under Requirements"
-    fi
-
-    if ! grep -qE '^## Files to (Create/Modify|Modify|Create)' "$file"; then
-        warn "README.md" "Missing '## Files to Create/Modify' section"
-    fi
-
-    if ! grep -qE '^## Getting Started' "$file"; then
-        warn "README.md" "Missing '## Getting Started' section"
-    else
-        if ! grep -qE 'composer install|npm install|yarn install|pnpm install' "$file"; then
-            warn "README.md" "Getting Started section may be missing dependency install instruction"
-        fi
-    fi
-
-    if ! grep -qE '^## Running Tests' "$file"; then
-        warn "README.md" "Missing '## Running Tests' section"
-    else
-        if ! grep -qE 'vendor/bin/pest|vendor/bin/phpunit|php artisan test|npm test|npx jest|ng test|cypress|vitest' "$file"; then
-            warn "README.md" "Running Tests section may be missing test command"
-        fi
+    local title_text
+    title_text=$(echo "$title_line" | sed -E 's/^#{1,6}[[:space:]]+//')
+    if [ "${#title_text}" -gt 255 ]; then
+        error "README.md" "Title exceeds 255 characters (${#title_text} chars)"
+        has_error=true
     fi
 
     # ── 11. Code blocks balance (rendering quality, not a parser throw → WARN) ──
@@ -344,11 +297,6 @@ validate_readme() {
     open_blocks=$(count_matches '^\x60\x60\x60' "$file")
     if [ "$((open_blocks % 2))" -ne 0 ]; then
         warn "README.md" "Unclosed code block (odd number of \`\`\` delimiters: $open_blocks)"
-    fi
-
-    # ── 12. Other Considerations section (recommended) ──
-    if ! grep -qE '^## Other Considerations' "$file"; then
-        info "README.md" "No '## Other Considerations' section (recommended for data-test attributes, linting notes)"
     fi
 
     if ! $has_error; then
@@ -366,6 +314,13 @@ validate_checklist() {
         return
     fi
 
+    # Training challenges ship as a download; the checklist is only shown in the exam
+    # (certificates-app ExaminationChallengeChecklistModal), so its content can't matter there.
+    if grep -qE '^training:[[:space:]]+true' "$(dirname "$file")/README.md" 2>/dev/null; then
+        ok "CHECKLIST.md present (training challenge — checklist not shown to candidates)"
+        return
+    fi
+
     local line_count
     line_count=$(wc -l < "$file" | tr -d '[:space:]')
 
@@ -375,46 +330,6 @@ validate_checklist() {
     if [ "$line_count" -eq 0 ]; then
         warn "CHECKLIST.md" "File is empty — challenge imports with an empty checklist"
         return
-    fi
-
-    # ── 1. Frontmatter is non-standard (parser ignores it) ──
-    local first_line
-    first_line=$(head -n 1 "$file")
-    if [ "$first_line" = "---" ]; then
-        warn "CHECKLIST.md" "Should not contain frontmatter (found '---' on line 1) — parser ignores non-'- ' lines"
-    fi
-
-    # ── 1b. YAML shape (informational only — parser does not Yaml::parse this file) ──
-    if command -v python3 >/dev/null 2>&1; then
-        local yaml_result
-        yaml_result=$(python3 -c "
-import sys, yaml
-try:
-    data = yaml.safe_load(sys.stdin)
-    if data is None:
-        print('EMPTY')
-    elif not isinstance(data, list):
-        print('NOT_LIST')
-    else:
-        print('OK:' + str(len(data)))
-except yaml.YAMLError as e:
-    print('ERROR:' + str(e))
-" < "$file" 2>&1)
-        case "$yaml_result" in
-            OK:*)
-                local yaml_count="${yaml_result#OK:}"
-                info "CHECKLIST.md" "Valid YAML array with $yaml_count top-level items"
-                ;;
-            EMPTY)
-                warn "CHECKLIST.md" "YAML parses as empty (null) — no checklist items"
-                ;;
-            NOT_LIST)
-                warn "CHECKLIST.md" "Not a YAML array/list — parser only reads '- ' lines, the rest is ignored"
-                ;;
-            ERROR:*)
-                warn "CHECKLIST.md" "Invalid YAML syntax (parser does not Yaml::parse this file, but fix for clarity): ${yaml_result#ERROR:}"
-                ;;
-        esac
     fi
 
     # ── 2. Lines that aren't '- ' items are ignored by the parser ──
@@ -430,8 +345,9 @@ except yaml.YAMLError as e:
             '- '*)
                 item_count=$((item_count + 1))
                 ;;
-            '  '*)
-                # Indented lines are valid YAML continuation (nested items, multiline strings)
+            '  '*|'#'*|'-'|'```'*)
+                # Indented continuations, headings, bare '-' and code fences are dropped
+                # by the parser without losing an item.
                 ;;
             *)
                 warn "CHECKLIST.md" "Line $line_num is not a '- ' checklist item and will be ignored by the parser: '$line'"
@@ -441,29 +357,6 @@ except yaml.YAMLError as e:
 
     if [ "$item_count" -eq 0 ]; then
         warn "CHECKLIST.md" "No '- ' checklist items found — challenge imports with an empty checklist"
-    elif [ "$item_count" -lt 3 ]; then
-        warn "CHECKLIST.md" "Only $item_count checklist items found (expected at least 3)"
-    fi
-
-    # ── 3. No consecutive blank lines ──
-    local double_blanks
-    double_blanks=$(awk 'prev_blank && /^$/ { count++ } END { print count+0 }' "$file")
-    if [ "$double_blanks" -gt 0 ]; then
-        warn "CHECKLIST.md" "Found consecutive blank lines"
-    fi
-
-    # ── 4. Last item should reference running tests ──
-    local last_item
-    last_item=$(grep '^- ' "$file" | tail -1)
-    if ! echo "$last_item" | grep -qiE 'test|pest|phpunit|cypress|jest|vitest|ng test'; then
-        warn "CHECKLIST.md" "Last checklist item should reference running tests"
-    fi
-
-    # ── 5. Check for empty checklist items ──
-    local empty_items
-    empty_items=$(count_matches '^- $' "$file")
-    if [ "$empty_items" -gt 0 ]; then
-        warn "CHECKLIST.md" "Found $empty_items empty checklist item(s) ('- ' with no text) — parser drops empties"
     fi
 
     if ! $has_error; then
@@ -475,20 +368,12 @@ validate_reviewer() {
     local file="$1"
     local project="$2"
 
-    if [ ! -f "$file" ]; then
-        info "REVIEWER.md" "Not present (optional file — reviewer checklist for code review)"
+    # Optional file: missing or empty imports as an empty reviewer checklist.
+    if [ ! -s "$file" ]; then
         return
     fi
 
     local has_error=false
-
-    # ── 1. Empty (parser → Str::markdown('') = '', no break → WARN) ──
-    local file_size
-    file_size=$(wc -c < "$file" | tr -d '[:space:]')
-    if [ "$file_size" -eq 0 ]; then
-        warn "REVIEWER.md" "File exists but is empty"
-        return
-    fi
 
     # ── 2. Should NOT have frontmatter (parser converts to HTML directly) ──
     local first_line
